@@ -40,8 +40,13 @@ void D3DApp::InitDevice(HWND hwnd)
     ////
     // Create the D3D device & context
 
+    UINT flags = 0;
+#ifdef _DEBUG
+    flags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
     D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
-    ThrowIfFailed(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, &featureLevel, 1, D3D11_SDK_VERSION, m_device.ReleaseAndGetAddressOf(), nullptr, m_deviceContext.ReleaseAndGetAddressOf()));
+    ThrowIfFailed(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, flags, &featureLevel, 1, D3D11_SDK_VERSION, m_device.ReleaseAndGetAddressOf(), nullptr, m_deviceContext.ReleaseAndGetAddressOf()));
 
 
     ///
@@ -63,17 +68,17 @@ void D3DApp::InitDevice(HWND hwnd)
     ////
     // Specify desired swap chain behavior and back buffer pixel format
 
-    DXGI_SWAP_CHAIN_DESC1 swapChainDesc{};
-    swapChainDesc.Width              = 0; // use window width
-    swapChainDesc.Height             = 0; // use window height
-    swapChainDesc.Format             = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+    DXGI_SWAP_CHAIN_DESC1 swapChainDesc {};
+    swapChainDesc.Width              = 0;                               // Use window width
+    swapChainDesc.Height             = 0;                               // Use window height
+    swapChainDesc.Format             = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB; // 32-bpp BRGA SRGB format
     swapChainDesc.Stereo             = FALSE;
     swapChainDesc.SampleDesc.Count	 = 1;
     swapChainDesc.SampleDesc.Quality = 0;
     swapChainDesc.BufferUsage        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    swapChainDesc.BufferCount        = 2;                                   // Double-buffering
+    swapChainDesc.BufferCount        = 2;                               // Double-buffering
     swapChainDesc.Scaling            = DXGI_SCALING_STRETCH;
-    swapChainDesc.SwapEffect         = DXGI_SWAP_EFFECT_DISCARD; // prefer DXGI_SWAP_EFFECT_FLIP_DISCARD, see Minimal D3D11 pt2 
+    swapChainDesc.SwapEffect         = DXGI_SWAP_EFFECT_DISCARD;        // Prefer DXGI_SWAP_EFFECT_FLIP_DISCARD
     swapChainDesc.AlphaMode          = DXGI_ALPHA_MODE_UNSPECIFIED;
     swapChainDesc.Flags              = 0;
 
@@ -83,13 +88,30 @@ void D3DApp::InitDevice(HWND hwnd)
     // ID3D11Texture2D pointing to the Swap Chain back buffer
     ThrowIfFailed(m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(m_backBuffer.ReleaseAndGetAddressOf())));
 
-    // RenderTargetView of back buffer - interface we use to specify color target
-    ThrowIfFailed(m_device->CreateRenderTargetView(m_backBuffer.Get(), nullptr, m_backBufferRTV.ReleaseAndGetAddressOf()));
-
 }
 
 void D3DApp::InitResources()
 {
+    ////
+    // Upload the screen-space triangle vertex data to a GPU buffer
+
+    // Three vertices - counter-clockwise winding
+    PosColorVertex VertexData[] =
+    {
+        { { 0.0f,  0.7f, 0.0f }, { 1.0f, 0.0f, 0.0f } }, // Top vertex
+        { {-0.4f, -0.7f, 0.0f }, { 0.0f, 0.0f, 1.0f } }, // Bottom-left vertex
+        { { 0.4f, -0.7f, 0.0f }, { 0.0f, 1.0f, 0.0f } }, // Bottom-right vertex
+    };
+
+    D3D11_BUFFER_DESC vertexBufferDesc {};
+    vertexBufferDesc.ByteWidth = sizeof(VertexData);
+    vertexBufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+    vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+
+    D3D11_SUBRESOURCE_DATA vertexData = { VertexData };
+    ThrowIfFailed(m_device->CreateBuffer(&vertexBufferDesc, &vertexData, m_vertexBuffer.ReleaseAndGetAddressOf()));
+
+
     ////
     // Load precompiled shader blobs from file (automatically compiled via Visual Studio & written to executable directory)
 
@@ -102,6 +124,7 @@ void D3DApp::InitResources()
     ComPtr<ID3DBlob> psBlob;
     ThrowIfFailed(D3DReadFileToBlob(L"PassThruPS.cso", psBlob.ReleaseAndGetAddressOf()));
     ThrowIfFailed(m_device->CreatePixelShader(psBlob->GetBufferPointer(), psBlob->GetBufferSize(), nullptr, m_pixelShader.ReleaseAndGetAddressOf()));
+
 
     ////
     // Declare the vertex layout - MUST align with declared vertex format in the Vertex Shader
@@ -122,7 +145,7 @@ void D3DApp::InitResources()
     D3D11_RASTERIZER_DESC rasterizerDesc {};
     rasterizerDesc.FillMode = D3D11_FILL_SOLID;
     rasterizerDesc.CullMode = D3D11_CULL_NONE;
-    rasterizerDesc.FrontCounterClockwise = false;
+    rasterizerDesc.FrontCounterClockwise = true;
 
     ThrowIfFailed(m_device->CreateRasterizerState(&rasterizerDesc, m_rasterizerState.ReleaseAndGetAddressOf()));
 
@@ -145,22 +168,9 @@ void D3DApp::InitResources()
 
 
     ////
-    // Upload the screen-space triangle vertex data to a GPU buffer
+    // Create RenderTargetView of back buffer
 
-    PosColorVertex VertexData[] =
-    {
-        { { 0.0f,  0.7f, 0.0f }, { 1.0f, 0.0f, 0.0f } },
-        { { 0.4f, -0.7f, 0.0f }, { 0.0f, 1.0f, 0.0f } },
-        { {-0.4f, -0.7f, 0.0f }, { 0.0f, 0.0f, 1.0f } },
-    };
-
-    D3D11_BUFFER_DESC vertexBufferDesc = {};
-    vertexBufferDesc.ByteWidth = sizeof(VertexData);
-    vertexBufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
-    vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-
-    D3D11_SUBRESOURCE_DATA vertexData = { VertexData };
-    ThrowIfFailed(m_device->CreateBuffer(&vertexBufferDesc, &vertexData, m_vertexBuffer.ReleaseAndGetAddressOf()));
+    ThrowIfFailed(m_device->CreateRenderTargetView(m_backBuffer.Get(), nullptr, m_backBufferRTV.ReleaseAndGetAddressOf()));
 }
 
 void D3DApp::Draw()
@@ -177,14 +187,13 @@ void D3DApp::Draw()
         0.0f, 1.0f                                                  // Min/Max Depth
     };
 
-    // Clear the rendertarget to dark grey
+    // Clear the render target to dark grey
     FLOAT backgroundColor[4] = { 0.025f, 0.025f, 0.025f, 1.0f };
-
     m_deviceContext->ClearRenderTargetView(m_backBufferRTV.Get(), backgroundColor);
-    m_deviceContext->RSSetViewports(1, &viewport);
 
     ID3D11RenderTargetView* rtvs[] = { m_backBufferRTV.Get() };
     m_deviceContext->OMSetRenderTargets(1, rtvs, nullptr);
+    m_deviceContext->RSSetViewports(1, &viewport);
 
     // Set the primitive topology and vertex layout
     m_deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -216,7 +225,7 @@ void D3DApp::Present()
         return;
     }
 
-    m_swapChain->Present(1, 0);
+    m_swapChain->Present(1, 0); // Flip on VBlank (vsync refresh rate interval)
 }
 
 void D3DApp::Shutdown()
@@ -235,5 +244,5 @@ void D3DApp::Shutdown()
     m_swapChain.Reset();
 
     m_deviceContext.Reset();
-    m_device.Reset();
+    m_device.Reset(); // Must be last API object uninitialized, otherwise error spew in the log
 }
