@@ -9,20 +9,13 @@
 
 #include "D3DApp.h"
 
+using namespace std::chrono;
+
 std::unique_ptr<D3DApp> g_d3dApp;
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    switch (uMsg)
-    {
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-
-    default:
-        g_d3dApp->HandleInput(hwnd, uMsg, wParam, lParam); // Pass user input to our app for handling
-    }
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    return g_d3dApp->HandleInput(hwnd, uMsg, wParam, lParam); // Pass user input to our app for handling
 }
 
 int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow)
@@ -69,13 +62,24 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
     ////
     // Run main game loop
 
-    MSG msg = { };
-    while (GetMessage(&msg, NULL, 0, 0) > 0)
-    {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+    auto prev = high_resolution_clock::now();
 
-        g_d3dApp->Update();     // Update game logic
+    while (g_d3dApp->IsRunning())
+    {
+        // Servic the Windows message queue
+        MSG msg {};
+        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+
+        // Compute delta time
+        auto curr = high_resolution_clock::now();
+        auto dt = duration<double>(curr - prev).count();
+        prev = curr;
+
+        g_d3dApp->Update(dt);     // Update game logic
         g_d3dApp->Draw();       // Draw game state each frame
         g_d3dApp->Present();    // Flip back buffer to the front
     }

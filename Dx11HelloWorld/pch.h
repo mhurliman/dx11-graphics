@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <d3d11_4.h>
 #include <exception>
 #include <memory>

@@ -87,7 +87,6 @@ void D3DApp::InitDevice(HWND hwnd)
 
     // ID3D11Texture2D pointing to the Swap Chain back buffer
     ThrowIfFailed(m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(m_backBuffer.ReleaseAndGetAddressOf())));
-
 }
 
 void D3DApp::InitResources()
@@ -245,4 +244,20 @@ void D3DApp::Shutdown()
 
     m_deviceContext.Reset();
     m_device.Reset(); // Must be last API object uninitialized, otherwise error spew in the log
+}
+
+
+LRESULT D3DApp::HandleInput(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    switch (uMsg)
+    {
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        m_isRunning = false;
+
+        return 0;
+
+    default:
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    }
 }

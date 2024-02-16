@@ -13,7 +13,8 @@ class D3DApp
 {
 public:
     D3DApp()
-        : m_width(0)
+        : m_isRunning(true)
+        , m_width(0)
         , m_height(0)
     { }
 
@@ -22,18 +23,21 @@ public:
         Shutdown();
     }
 
-    void Init(HWND hwnd);
-    void HandleInput(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {}
-    void Update() {}
-    void Draw();
-    void Present();
-    void Shutdown();
+    bool    IsRunning() const { return m_isRunning; }
+
+    void    Init(HWND hwnd);
+    LRESULT HandleInput(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+    void    Update(double dt) {}
+    void    Draw();
+    void    Present();
+    void    Shutdown();
 
 private:
-    void InitDevice(HWND hwnd);
-    void InitResources();
+    void    InitDevice(HWND hwnd);
+    void    InitResources();
 
 private:
+    bool                            m_isRunning;
     UINT                            m_width;
     UINT                            m_height;
 
