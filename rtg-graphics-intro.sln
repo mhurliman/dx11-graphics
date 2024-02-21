@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.34301.259
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Dx11HelloWorld", "Dx11HelloWorld\Dx11HelloWorld.vcxproj", "{A266691E-2467-4984-AD6A-7569CAB1C515}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Dx11MeshViewer", "Dx11MeshViewer\Dx11MeshViewer.vcxproj", "{89C25B0F-535F-4126-9FED-B634B5DF0F52}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -15,6 +17,10 @@ Global
 		{A266691E-2467-4984-AD6A-7569CAB1C515}.Debug|x64.Build.0 = Debug|x64
 		{A266691E-2467-4984-AD6A-7569CAB1C515}.Release|x64.ActiveCfg = Release|x64
 		{A266691E-2467-4984-AD6A-7569CAB1C515}.Release|x64.Build.0 = Release|x64
+		{89C25B0F-535F-4126-9FED-B634B5DF0F52}.Debug|x64.ActiveCfg = Debug|x64
+		{89C25B0F-535F-4126-9FED-B634B5DF0F52}.Debug|x64.Build.0 = Debug|x64
+		{89C25B0F-535F-4126-9FED-B634B5DF0F52}.Release|x64.ActiveCfg = Release|x64
+		{89C25B0F-535F-4126-9FED-B634B5DF0F52}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

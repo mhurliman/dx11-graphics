@@ -31,7 +31,7 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
     // Create a window
 
     const wchar_t className[] = L"RTG Graphics Class";
-    const wchar_t* appName = L"Dx11HelloWorld";
+    const wchar_t* appName = L"Dx11MeshViewer";
 
     WNDCLASS wc = { };
     wc.lpfnWndProc = WindowProc;

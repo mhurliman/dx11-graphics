@@ -28,10 +28,11 @@ void D3DApp::Init(HWND hwnd)
     RECT rect{};
     GetClientRect(hwnd, &rect);
 
-    m_width = static_cast<UINT>(rect.right - rect.left);
-    m_height = static_cast<UINT>(rect.bottom - rect.top);
+    UINT width = static_cast<UINT>(rect.right - rect.left);
+    UINT height = static_cast<UINT>(rect.bottom - rect.top);
 
     InitDevice(hwnd);
+    ResizeResources(width, height);
     InitResources();
 }
 
@@ -42,7 +43,7 @@ void D3DApp::InitDevice(HWND hwnd)
 
     UINT flags = 0;
 #ifdef _DEBUG
-    flags |= D3D11_CREATE_DEVICE_DEBUG;
+    flags |= D3D11_CREATE_DEVICE_DEBUG; // Use the validated D3D driver in debug mode
 #endif
 
     D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_0;
@@ -71,22 +72,48 @@ void D3DApp::InitDevice(HWND hwnd)
     DXGI_SWAP_CHAIN_DESC1 swapChainDesc {};
     swapChainDesc.Width              = 0;                               // Use window width
     swapChainDesc.Height             = 0;                               // Use window height
-    swapChainDesc.Format             = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB; // 32-bpp BRGA SRGB format
+    swapChainDesc.Format             = DXGI_FORMAT_R8G8B8A8_UNORM;      // 32-bpp RGBA format
     swapChainDesc.Stereo             = FALSE;
     swapChainDesc.SampleDesc.Count	 = 1;
     swapChainDesc.SampleDesc.Quality = 0;
     swapChainDesc.BufferUsage        = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainDesc.BufferCount        = 2;                               // Double-buffering
     swapChainDesc.Scaling            = DXGI_SCALING_STRETCH;
-    swapChainDesc.SwapEffect         = DXGI_SWAP_EFFECT_DISCARD;        // Prefer DXGI_SWAP_EFFECT_FLIP_DISCARD
+    swapChainDesc.SwapEffect         = DXGI_SWAP_EFFECT_FLIP_DISCARD;   // Prefer DXGI_SWAP_EFFECT_FLIP_DISCARD
     swapChainDesc.AlphaMode          = DXGI_ALPHA_MODE_UNSPECIFIED;
     swapChainDesc.Flags              = 0;
 
     // DXGISwapChain - API object providing access to swap chain buffers
     ThrowIfFailed(dxgiFactory->CreateSwapChainForHwnd(m_device.Get(), hwnd, &swapChainDesc, nullptr, nullptr, m_swapChain.ReleaseAndGetAddressOf()));
+}
+
+void D3DApp::ResizeResources(UINT width, UINT height)
+{
+    m_backBufferRTV.Reset();
+    m_backBuffer.Reset();
+
+    if (width != m_width || height != m_height)
+    {
+        // The window size has changed - we need to resize the swap buffers and reacquire them
+        m_width = width;
+        m_height = height;
+
+        ThrowIfFailed(m_swapChain->ResizeBuffers(2, m_width, m_height, DXGI_FORMAT_R8G8B8A8_UNORM, 0));
+    }
 
     // ID3D11Texture2D pointing to the Swap Chain back buffer
     ThrowIfFailed(m_swapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(m_backBuffer.ReleaseAndGetAddressOf())));
+
+
+    ////
+    // Create render target view of back buffer, and the depth buffer w/ depth-stencil view
+
+    D3D11_RENDER_TARGET_VIEW_DESC rtvDesc{};
+    rtvDesc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+    rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; // sRGB color writes
+    rtvDesc.Texture2D.MipSlice = 0;
+
+    ThrowIfFailed(m_device->CreateRenderTargetView(m_backBuffer.Get(), &rtvDesc, m_backBufferRTV.ReleaseAndGetAddressOf()));
 }
 
 void D3DApp::InitResources()
@@ -104,10 +131,11 @@ void D3DApp::InitResources()
 
     D3D11_BUFFER_DESC vertexBufferDesc {};
     vertexBufferDesc.ByteWidth = sizeof(VertexData);
-    vertexBufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+    vertexBufferDesc.Usage     = D3D11_USAGE_IMMUTABLE;
     vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 
-    D3D11_SUBRESOURCE_DATA vertexData = { VertexData };
+    D3D11_SUBRESOURCE_DATA vertexData {};
+    vertexData.pSysMem = VertexData;
     ThrowIfFailed(m_device->CreateBuffer(&vertexBufferDesc, &vertexData, m_vertexBuffer.ReleaseAndGetAddressOf()));
 
 
@@ -142,25 +170,25 @@ void D3DApp::InitResources()
 
     // Rasterizer State - solid fill mode & disable primitive culling
     D3D11_RASTERIZER_DESC rasterizerDesc {};
-    rasterizerDesc.FillMode = D3D11_FILL_SOLID;
-    rasterizerDesc.CullMode = D3D11_CULL_NONE;
+    rasterizerDesc.FillMode              = D3D11_FILL_SOLID;
+    rasterizerDesc.CullMode              = D3D11_CULL_NONE;
     rasterizerDesc.FrontCounterClockwise = true;
 
     ThrowIfFailed(m_device->CreateRasterizerState(&rasterizerDesc, m_rasterizerState.ReleaseAndGetAddressOf()));
 
     // Depth-stencil State - disable depth testing & writes
     D3D11_DEPTH_STENCIL_DESC depthStencilDesc {};
-    depthStencilDesc.DepthEnable = false;
+    depthStencilDesc.DepthEnable    = false;
     depthStencilDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-    depthStencilDesc.DepthFunc = D3D11_COMPARISON_ALWAYS;
+    depthStencilDesc.DepthFunc      = D3D11_COMPARISON_ALWAYS;
 
     ThrowIfFailed(m_device->CreateDepthStencilState(&depthStencilDesc, m_depthStencilState.ReleaseAndGetAddressOf()));
 
     // Blend State - disable blend
     D3D11_BLEND_DESC blendDesc {};
-    blendDesc.IndependentBlendEnable = false;
-    blendDesc.AlphaToCoverageEnable = false;
-    blendDesc.RenderTarget[0].BlendEnable = false;
+    blendDesc.IndependentBlendEnable                = false;
+    blendDesc.AlphaToCoverageEnable                 = false;
+    blendDesc.RenderTarget[0].BlendEnable           = false;
     blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
 
     ThrowIfFailed(m_device->CreateBlendState(&blendDesc, m_blendState.ReleaseAndGetAddressOf()));
@@ -169,32 +197,33 @@ void D3DApp::InitResources()
     ////
     // Create RenderTargetView of back buffer
 
-    ThrowIfFailed(m_device->CreateRenderTargetView(m_backBuffer.Get(), nullptr, m_backBufferRTV.ReleaseAndGetAddressOf()));
+    D3D11_RENDER_TARGET_VIEW_DESC rtvDesc {};
+    rtvDesc.ViewDimension       = D3D11_RTV_DIMENSION_TEXTURE2D;
+    rtvDesc.Format              = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+    rtvDesc.Texture2D.MipSlice  = 0;
+
+    ThrowIfFailed(m_device->CreateRenderTargetView(m_backBuffer.Get(), &rtvDesc, m_backBufferRTV.ReleaseAndGetAddressOf()));
 }
 
 void D3DApp::Draw()
 {
-    if (m_width == 0 || m_height == 0)
-    {
-        return;
-    }
+    // Clear the render target to dark grey
+    FLOAT backgroundColor[4] = { 0.025f, 0.025f, 0.025f, 1.0f };
+    m_deviceContext->ClearRenderTargetView(m_backBufferRTV.Get(), backgroundColor);
 
-    D3D11_VIEWPORT viewport = 
+    // Bind the color render target
+    ID3D11RenderTargetView* rtvs[] = { m_backBufferRTV.Get() };
+    m_deviceContext->OMSetRenderTargets(1, rtvs, nullptr);
+
+    D3D11_VIEWPORT viewport =
     {
         0.0f, 0.0f,                                                 // Top-left X, Y
         static_cast<float>(m_width), static_cast<float>(m_height),  // Width, Height
         0.0f, 1.0f                                                  // Min/Max Depth
     };
-
-    // Clear the render target to dark grey
-    FLOAT backgroundColor[4] = { 0.025f, 0.025f, 0.025f, 1.0f };
-    m_deviceContext->ClearRenderTargetView(m_backBufferRTV.Get(), backgroundColor);
-
-    ID3D11RenderTargetView* rtvs[] = { m_backBufferRTV.Get() };
-    m_deviceContext->OMSetRenderTargets(1, rtvs, nullptr);
     m_deviceContext->RSSetViewports(1, &viewport);
 
-    // Set the primitive topology and vertex layout
+    // Set the desired primitive topology and vertex layout
     m_deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     m_deviceContext->IASetInputLayout(m_inputLayout.Get());
 
@@ -204,11 +233,11 @@ void D3DApp::Draw()
     ID3D11Buffer* vbuffers[] = { m_vertexBuffer.Get() };
     m_deviceContext->IASetVertexBuffers(0, 1, vbuffers, &stride, &offset);
 
-    // Set the vertex & pixel shader programs
+    // Bind vertex & pixel shader programs
     m_deviceContext->VSSetShader(m_vertexShader.Get(), nullptr, 0);
     m_deviceContext->PSSetShader(m_pixelShader.Get(), nullptr, 0);
 
-    // Set the fixed-function graphics pipeline state
+    // Bind fixed-function graphics pipeline state
     m_deviceContext->RSSetState(m_rasterizerState.Get());
     m_deviceContext->OMSetDepthStencilState(m_depthStencilState.Get(), 0);
     m_deviceContext->OMSetBlendState(m_blendState.Get(), nullptr, 0xffffffff);
@@ -219,31 +248,7 @@ void D3DApp::Draw()
 
 void D3DApp::Present()
 {
-    if (m_width == 0 || m_height == 0)
-    {
-        return;
-    }
-
-    m_swapChain->Present(1, 0); // Flip on VBlank (vsync refresh rate interval)
-}
-
-void D3DApp::Shutdown()
-{
-    m_depthStencilState.Reset();
-    m_rasterizerState.Reset();
-
-    m_pixelShader.Reset();
-    m_vertexShader.Reset();
-    m_inputLayout.Reset();
-    m_vertexBuffer.Reset();
-
-    m_backBufferRTV.Reset();
-    m_backBuffer.Reset();
-
-    m_swapChain.Reset();
-
-    m_deviceContext.Reset();
-    m_device.Reset(); // Must be last API object uninitialized, otherwise error spew in the log
+    ThrowIfFailed(m_swapChain->Present(1, 0)); // Flip on VBlank (vsync refresh rate interval)
 }
 
 
@@ -256,6 +261,16 @@ LRESULT D3DApp::HandleInput(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         m_isRunning = false;
 
         return 0;
+
+    case WM_SIZE:
+    {
+        UINT width = (lParam & 0x0000ffff) >> 0;
+        UINT height = (lParam & 0xffff0000) >> 16;
+
+        ResizeResources(width, height);
+
+        return 0;
+    }
 
     default:
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
