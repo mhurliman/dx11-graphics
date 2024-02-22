@@ -295,13 +295,15 @@ void D3DApp::Update(float dt)
     // Recompute constant buffer data each frame
 
     const float degToRads = XM_PI / 180.0f;
+	XMVECTOR yAxis = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
     // Compute our object's world-space transform
-    XMMATRIX scaleMat = XMMatrixScaling(m_objectScale, m_objectScale, m_objectScale);
-    XMMATRIX transMat = XMMatrixTranslationFromVector(DirectX::XMLoadFloat3(&m_objectPosition));
-    XMMATRIX rotMat   = XMMatrixRotationY(m_objectRotation * degToRads);
- 
-    XMMATRIX worldMat = scaleMat * rotMat * transMat;
+	XMMATRIX worldMat = XMMatrixAffineTransformation(
+		XMVectorReplicate(m_objectScale), 
+		XMQuaternionIdentity(), 
+		XMQuaternionRotationAxis(yAxis, m_objectRotation * degToRads), 
+		XMLoadFloat3(&m_objectPosition)
+	);
 
     // Compute camera position
     float phi   = m_cameraPhi * degToRads;
@@ -316,18 +318,18 @@ void D3DApp::Update(float dt)
     );
 
     float aspectRatio = static_cast<float>(m_width) / static_cast<float>(m_height);
-    XMVECTOR yAxis    = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
 
     XMMATRIX viewMat         = XMMatrixLookAtRH(cameraPosition, DirectX::XMLoadFloat3(&m_cameraFocus), yAxis);
-    XMMATRIX projMat         = XMMatrixPerspectiveFovRH(DirectX::XMConvertToRadians(60.0f), aspectRatio, 0.25f, 1000.0f); // FOVY, Aspect ratio, Near Plane Z, Far Plane Z
-    XMMATRIX worldVieProjMat = worldMat * viewMat * projMat;
+    XMMATRIX projMat         = XMMatrixPerspectiveFovRH(60.0f * degToRads, aspectRatio, 0.25f, 1000.0f); // FOVY, Aspect ratio, Near Plane Z, Far Plane Z
+    XMMATRIX worldViewProjMat = worldMat * viewMat * projMat;
+
 
     ////
     // Populate our staging buffer
 
     AppShaderConstants constants {};
-    XMStoreFloat4x4(&constants.World, worldMat);
-    XMStoreFloat4x4(&constants.WorldViewProjection, worldVieProjMat);
+    XMStoreFloat4x4(&constants.World, XMMatrixTranspose(worldMat)); // Want to keep consistent
+    XMStoreFloat4x4(&constants.WorldViewProjection, XMMatrixTranspose(worldViewProjMat));
 
     XMStoreFloat3(&constants.ObjectColor, XMLoadFloat3(&m_objectColor));
     constants.ObjectShininess = m_objectShininess;

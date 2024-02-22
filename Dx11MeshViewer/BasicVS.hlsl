@@ -63,11 +63,11 @@ VSInterpolants VSMain(VSInput vin)
     VSInterpolants vout;
 
     // Transform the vertex position into clip space
-    vout.PositionCS = mul(WorldViewProjection, float4(vin.Position, 1));
+    vout.PositionCS = mul(float4(vin.Position, 1), WorldViewProjection);
 
     // Transform position and normal to world space for pixel shader lighting calculations
-    vout.PositionWS = mul(World, float4(vin.Position, 1)).xyz;
-    vout.NormalWS   = mul(World, float4(vin.Normal, 0)).xyz;
+    vout.PositionWS = mul(float4(vin.Position, 1), World).xyz;
+    vout.NormalWS   = mul(float4(vin.Normal, 0), World).xyz;
 
     return vout;
 }
