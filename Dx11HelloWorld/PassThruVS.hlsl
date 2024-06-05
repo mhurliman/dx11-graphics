@@ -1,9 +1,6 @@
-//--------------------------------------------------------------------------------------
+//
 // PassThruVS.hlsl
 //
-// EA Runtime Technology Group (RTG)
-// Copyright (C) Electronic Arts. All rights reserved.
-//--------------------------------------------------------------------------------------
 
 // Vertex shader input definition - MUST align with the bound input layout and vertex buffer data format
 struct VSInput

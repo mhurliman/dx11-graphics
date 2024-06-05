@@ -1,9 +1,6 @@
-//--------------------------------------------------------------------------------------
+//
 // PassThruPS.hlsl
 //
-// EA Runtime Technology Group (RTG)
-// Copyright (C) Electronic Arts. All rights reserved.
-//--------------------------------------------------------------------------------------
 
 // Interpolants from the vertex shader - must align with vertex shader output (done through the semantics, e.g. COLOR0)
 struct VSInterpolants
